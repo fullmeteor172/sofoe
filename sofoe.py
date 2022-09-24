@@ -89,7 +89,7 @@ class Utility:
                     #Was redirected to a captive portal
                     #Using regex to get the url of the portal
                     host_url = re.findall("https://.+(?=' )", data)[0]
-                    logging.info(f'Portal found: {host_url}')
+                    logging.info(f'Portal found: {host_url}') 
                     Global.does_portal_exist = True
                     return host_url
                 else:
@@ -99,7 +99,7 @@ class Utility:
             logging.debug('Failed to reach msft-connect or a portal')
             Global.does_portal_exist = False
             return False
-            
+    
     #Returns headers for POST and GET requests
     def header_generator(uni_host: str, payload_length: int, request_type: Request_type):
         url_parse = urlparse(uni_host)

@@ -36,7 +36,7 @@ This will work in **ALL** the buildings on campus, the MH's, LH's and all Academ
 - [x] Logs events to make troubleshooting easy in `app.log`
 - [x] Auto-detects URL for the Login Portal
 - [x] Doesn't break if you connect to a different network
-- [x] Light-Weight, Uses **NO** external python libraries
+- [x] Light-Weight and Fast
 - [x] Cross-Platform code
 - [ ] Choice to pick between emulating a desktop or mobile client
 
@@ -52,7 +52,11 @@ The source code is open for all to see, feel free to go through it if you're sti
 ```
 git clone https://github.com/fullmeteor172/sofoe.git
 ```
-3. Set your username and password by opening the `credentials.json` file
+3. Install additional requirements by running
+```
+pip install -r requirements.txt
+```
+4. Set your username and password by opening the `credentials.json` file
 ```json
 #👇Change username and password here
 {
@@ -60,7 +64,7 @@ git clone https://github.com/fullmeteor172/sofoe.git
     "password":""
 }
 ```
-4. Run it! 🎊
+5. Run it! 🎊
 ```
 py sofoe.py
 ```
