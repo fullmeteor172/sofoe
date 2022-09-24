@@ -2,7 +2,7 @@
 
 <div align="center">
   <a href="https://github.com/fullmeteor172/sofoe">
-    <img src="images/logo.png" alt="Sofoe Logo" width="450">
+    <img src="images/logo.png" alt="Sofoe Logo" width="350">
   </a>
   <h3 align="center">F*ck captive portals</h3>
   <p align="center">
@@ -42,25 +42,32 @@ This will work in **ALL** the buildings on campus, the MH's, LH's and all Academ
 
 ## Is it Legal / Safe / Ok to run?
 **Yes. 🗿**
+
 It basically does what the WiFi login website does, just more naked and faster.
 The source code is open for all to see, feel free to go through it if you're still worried!
 
 ## How do I run this?
 1. Ensure that you have [python3](https://www.python.org/downloads/) installed
-2. Clone or Download the code of this repository
-`git clone <link>`
-3. Set your username and password by opening `credentials.json`
+2. Clone or [Download](https://github.com/fullmeteor172/sofoe/archive/refs/heads/main.zip) the code of this repository
+```
+git clone https://github.com/fullmeteor172/sofoe.git
+```
+3. Set your username and password by opening the `credentials.json` file
 ```json
 #👇Change username and password here
 {
-    "username":"<Add it inside the quotes>",
+    "username":"Add it inside the quotes",
     "password":""
 }
 ```
 4. Run it! 🎊
-`py sofoe.py`
+```
+py sofoe.py
+```
 
 5. Optional Step: Set it up to run on boot. (DIY based on your os)
 
 ## License
-Distributed under the GNU AGPLv3. See `LICENSE.txt` for more information>)
+Distributed under the GNU AGPLv3. See `LICENSE.txt` for more information.
+
+By Dhruv Jha
