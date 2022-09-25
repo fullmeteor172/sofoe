@@ -12,6 +12,13 @@ import time
 from urllib.parse import urlparse
 import requests
 
+class Client_type(Enum):
+    MOBILE = 1
+    DESKTOP = 2
+    
+    def __str__(self):
+        return self.name
+
 class Request_type(Enum):
     POST = 1
     GET = 2
@@ -19,6 +26,7 @@ class Request_type(Enum):
 class Portal_action(Enum):
     LOGIN = 1
     LOGOUT = 2
+    ACK = 3
     
 class Server_response(Enum):
     LOGIN_SUCCESSFUL = 1
@@ -33,14 +41,17 @@ class Global:
     username = None
     password = None
     
+    client_type = None
     wan_state = None
     does_portal_exist = False
     portal_url = None
     time_of_last_login = None
     time_of_start = None
+    time_of_last_ack = None
     last_server_message = None
     
-    user_agent = 'Mozilla/5.0 (Android 13; Mobile; rv:68.0) Gecko/68.0 Firefox/104.0'
+    user_agent = None
+    
     
 class Utility:
     #Sets global vars of username and password from the .json file
@@ -125,20 +136,31 @@ class Utility:
         
         return headers
     
+    def get_product_type():
+        if Global.client_type == Client_type.MOBILE:
+            return 2
+        else:
+            return 0
+    
     #Returns payload string for sophos POST request
     def payload_generator(portal_action: Portal_action):
         epoch_time = int(time.time()*1000)
         mode = None
-        creds_field = None
+        creds_field = f'username={Global.username}'
         
         if portal_action == Portal_action.LOGIN:
             mode = '191'
-            creds_field = f'username={Global.username}&password={Global.password}'
+            creds_field += f'&password={Global.password}'
+        
         elif portal_action == Portal_action.LOGOUT:
             mode = '193'
-            creds_field = f'username={Global.username}'
+
+        elif portal_action == Portal_action.ACK:
+            mode = '192'
+
+        product_type = Utility.get_product_type()
         
-        payload = f'mode={mode}&{creds_field}&a={epoch_time}&producttype=2'
+        payload = f'mode={mode}&{creds_field}&a={epoch_time}&producttype={product_type}'
         return payload
     
     #Method to log changes of the WAN State
@@ -159,7 +181,7 @@ class Utility:
     def print_logo(scriptState: str):
         os.system('cls' if os.name == 'nt' else 'clear')
         print(f"""
---------------v3.00---------------
+--------------v3.10---------------
    _____ ____  __________  ______
   / ___// __ \/ ____/ __ \/ ____/
   \__ \/ / / / /_  / / / / __/   
@@ -171,6 +193,7 @@ class Utility:
     def print_states():
         print('      ~ Ctrl + C to Stop! ~')
         print(f'\n\nUsername:\t{Global.username}')
+        print(f'Client Type:\t{Global.client_type}')
         print(f'Internet Up:\t{Global.wan_state}')
         print(f'Portals Msg:\t{Global.last_server_message}')
         
@@ -179,6 +202,48 @@ class Utility:
         print(f'Logged In At:\t{Global.time_of_last_login}')
         print(f'Running Since:\t{Global.time_of_start}')
         
+        if Global.client_type == Client_type.DESKTOP:
+            print(f'Last Ack At:\t{Global.time_of_last_ack}')
+        
+    def change_client_type():
+        if Global.client_type == Client_type.MOBILE or Global.client_type == None:
+            Global.client_type = Client_type.DESKTOP
+            Global.user_agent = 'Mozilla/5.0 (Windows NT 5.1; rv:7.0.1) Gecko/20100101 Firefox/7.0.1'
+        else:
+            Global.client_type = Client_type.MOBILE
+            Global.user_agent = 'Mozilla/5.0 (Android 13; Mobile; rv:68.0) Gecko/68.0 Firefox/104.0'
+        
+        logging.info(f'Client type changed to {Global.client_type}')
+
+def get_req(uni_host: str):
+    #Initialization Stuff
+    host_name = urlparse(uni_host).hostname
+    host_port = urlparse(uni_host).port
+    conn = http.client.HTTPSConnection(
+                                    host_name,
+                                    host_port,
+                                    context=ssl._create_unverified_context(),
+                                    timeout = 4
+                                    )
+
+    response = None
+    headers = Utility.header_generator(uni_host, 0, Request_type.GET)
+    url_tail = f'/live?{Utility.payload_generator(Portal_action.ACK)}'
+    payload = ''
+    #Request stuff
+    try:
+        conn.request("GET", url_tail, payload, headers)
+    except socket.timeout as st:
+        logging.warning('GET request to server timed out')
+        
+    except client.HTTPException as e:
+        logging.warning("GET request returned error")
+    else:
+        response = conn.getresponse()
+    finally:
+        if response != None: parse_server_response(response)
+        conn.close()
+        return response
 
 def post_req(uni_host: str, portal_action: Portal_action):
     
@@ -228,6 +293,10 @@ def parse_server_response(response):
         logging.info('Logged Out Successfully')
         Global.last_server_message = Server_response.LOGOUT_SUCCESSFUL
     
+    elif re.search("<l.+e><ack><!.+k]]", data) != None:
+        logging.debug('Server Acknowledgement Successful')
+        Global.time_of_last_ack = datetime.now()
+        
     elif re.search("Invalid.+admin", data) != None:
         logging.info('Invalid Credentials')
         Global.last_server_message = Server_response.INVALID_CREDENTIALS
@@ -237,6 +306,7 @@ def parse_server_response(response):
     elif re.search("Y.+max.+limit", data) != None:
         Global.last_server_message = Server_response.MAX_DEVICES_REACHED
         logging.debug('Max Devices Reached')
+        
 
 
 def main():
@@ -247,7 +317,9 @@ def main():
 
 def program_loop():
     exit_flag = False
+    loop_counter = 0 #Needed for sending ack req for DESKTOP Client mode
     while not exit_flag:
+        loop_counter += 1
         Utility.print_logo('-- RUNNING! --')
         Utility.print_states()
         time.sleep(3)
@@ -263,11 +335,22 @@ def program_loop():
                     post_req(uni_host=portal_url, portal_action=Portal_action.LOGIN)
                 except Exception as e:
                     logging.error(e)
+        else:
+            #When WAN is up
+            if Global.client_type == Client_type.DESKTOP and loop_counter >= 10 and Global.portal_url != None:
+                try:
+                    get_req(Global.portal_url)
+                    loop_counter = 0
+                except Exception as e:
+                    logging.error(e)
+                
+                
                 
 def pause_menu():
     Utility.print_logo('-- STOPPED! --')
     
-    print(f'\nPortals Last Msg:\t{Global.last_server_message}')
+    print(f'\nPortals Msg:\t{Global.last_server_message}')
+    print(f'Client type:\t{Global.client_type}')
     print('\n\nAvailable Options:')
     disable_logout_option = (Global.portal_url == None)
     if not disable_logout_option:
@@ -278,6 +361,7 @@ def pause_menu():
         print('[ ! ] No portal found to logout from')
     print('[ 3 ] Just Exit')
     print('[ 4 ] Resume Script')
+    print('[ 5 ] Change Client type')
     
     try:
         user_input = int(input('\nYour choice: '))
@@ -296,6 +380,15 @@ def pause_menu():
         exit()
     elif user_input == 4:
         main()
+    elif user_input == 5 and (not disable_logout_option):
+        post_req(Global.portal_url, Portal_action.LOGOUT)
+        Utility.change_client_type()
+        post_req(Global.portal_url, Portal_action.LOGIN)
+        pause_menu()
+        
+    elif user_input == 5 and disable_logout_option:
+        Utility.change_client_type()
+        pause_menu()
     else:
         pause_menu()
 
@@ -306,4 +399,5 @@ if __name__ == '__main__':
                         format='%(asctime)s -\t%(levelname)s\t%(message)s')
     logging.info('Script Started')
     Utility.get_creds_from_json('credentials.json')
+    Utility.change_client_type()
     main()
